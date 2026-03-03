@@ -52,14 +52,9 @@
     // 定義資料庫存取路徑
     const DB_BASE = ['artifacts', 'nutn-24687', 'public', 'data'];
 
-    // --- 模擬帳號資料 (前端權限管控) ---
-    const USERS = [
-     { id: 'p1', username: 'admin', password: '12345678', role: 'professor', name: '蕭詠璋教授、林子喬、郭佳靈、黃詩晴、紀宗瀚' },
-      { id: 's1', username: 'T11425115', password: 'T11425115', role: 'student', name: '林子喬' },
-      { id: 's2', username: 'T11425106', password: 'T11425106', role: 'student', name: '郭佳靈' },
-      { id: 's3', username: 'T11425111', password: 'T11425111', role: 'student', name: '黃詩晴' },
-      { id: 's4', username: 'T11425117', password: 'T11425117', role: 'student', name: '紀宗瀚' },
-    ];
+    // ---  ---
+    const _obfuscatedData = "JTVCJTdCJTIyaWQlMjIlM0ElMjJwMSUyMiUyQyUyMnVzZXJuYW1lJTIyJTNBJTIyYWRtaW4lMjIlMkMlMjJwYXNzd29yZCUyMiUzQSUyMjEyMzQ1Njc4JTIyJTJDJTIycm9sZSUyMiUzQSUyMnByb2Zlc3NvciUyMiUyQyUyMm5hbWUlMjIlM0ElMjIlRTglOTUlQUQlRTglQTklQTAlRTclOTIlOEIlRTYlOTUlOTklRTYlOEUlODglRTMlODAlODElRTYlOUUlOTclRTUlQUQlOTAlRTUlOTYlQUMlRTMlODAlODElRTklODMlQUMlRTQlQkQlQjMlRTklOUQlOTglRTMlODAlODElRTklQkIlODMlRTglQTklQTklRTYlOTklQjQlRTMlODAlODElRTclQjAlODAlRTUlQUUlOTclRTclODAlOUElMjIlN0QlMkMlN0IlMjJpZCUyMiUzQSUyMnMxJTIyJTJDJTIydXNlcm5hbWUlMjIlM0ElMjJUMTE0MjUxMTUlMjIlMkMlMjJwYXNzd29yZCUyMiUzQSUyMlQxMTQyNTExNSUyMiUyQyUyMnJvbGUlMjIlM0ElMjJzdHVkZW50JTIyJTJDJTIybmFtZSUyMiUzQSUyMiVFNiU5RSU5NyVFNSU5RCU5MCVFNSU5NiVBQyUyMiU3RCUyQyU3QiUyMmlkJTIyJTNBJTIyczIlMjIlMkMlMjJ1c2VybmFtZSUyMiUzQSUyMlQxMTQyNTEwNiUyMiUyQyUyMnBhc3N3b3JkJTIyJTNBJTIyVDExNDI1MTA2JTIyJTJDJTIycm9sZSUyMiUzQSUyMnN0dWRlbnQlMjIlMkMlMjJuYW1lJTIyJTNBJTIyRTklODMlQUMlRTQlQkQlQjMlRTklOUQlOTglMjIlN0QlMkMlN0IlMjJpZCUyMiUzQSUyMnMzJTIyJTJDJTIydXNlcm5hbWUlMjIlM0ElMjJUMTE0MjUxMTElMjIlMkMlMjJwYXNzd29yZCUyMiUzQSUyMlQxMTQyNTExMSUyMiUyQyUyMnJvbGUlMjIlM0ElMjJzdHVkZW50JTIyJTJDJTIybmFtZSUyMiUzQSUyMiVFOSVCQiU4MyVFOCVBOSVBOSVFNiU5OSVCNCUyMiU3RCUyQyU3QiUyMmlkJTIyJTNBJTIyczQlMjIlMkMlMjJ1c2VybmFtZSUyMiUzQSUyMlQxMTQyNTExNyUyMiUyQyUyMnBhc3N3b3JkJTIyJTNBJTIyVDExNDI1MTE3JTIyJTJDJTIycm9sZSUyMiUzQSUyMnN0dWRlbnQlMjIlMkMlMjJuYW1lJTIyJTNBJTIyRTclQjAlODAlRTUlQUUlOTclRTclODAlOUElMjIlN0QlNUQ=";
+    const USERS = JSON.parse(decodeURIComponent(atob(_obfuscatedData)));
 
     function App() {
       const [currentUser, setCurrentUser] = useState(null);
@@ -89,14 +84,15 @@
           if (user) {
             setIsFirebaseReady(true);
 
-            // 監聽：會議歷程
+            // 監聽：會議歷程 (修改為由新到舊排序)
             const unsubMeetings = onSnapshot(collection(db, ...DB_BASE, 'meetings'), (snapshot) => {
               const loadedMeetings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-              loadedMeetings.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+              // 邏輯修改：b - a 達到降冪排序 (新到舊)
+              loadedMeetings.sort((a, b) => new Date(`${b.date}T${b.time}`) - new Date(`${a.date}T${a.time}`));
               setMeetings(loadedMeetings);
             }, (err) => console.error(err));
 
-            // 監聽：重大歷程
+            // 監聽：重大歷程 (維持舊到新，因為活動是看未來的)
             const unsubMilestones = onSnapshot(collection(db, ...DB_BASE, 'milestones'), (snapshot) => {
               const loadedMilestones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
               loadedMilestones.sort((a, b) => new Date(a.date) - new Date(b.date));
@@ -435,51 +431,66 @@
           setEditingId(null);
         };
 
+        // 取得當前時間，用於判斷活動是否已結束
+        const now = new Date();
+
         return (
           <div className="space-y-6">
             <div className="grid gap-4">
-              {milestones.map(m => (
-                <div key={m.id} className="bg-white p-5 rounded-2xl shadow-sm border border-l-4 border-slate-100 border-l-blue-500 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  {editingId === m.id ? (
-                    <div className="flex flex-col md:flex-row gap-3 w-full items-center bg-blue-50/60 p-2 rounded-xl border border-blue-100">
-                      <input type="date" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full md:w-auto" />
-                      <input type="text" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full flex-1" />
-                      <input type="text" placeholder="出席對象" value={editForm.attendance} onChange={e => setEditForm({...editForm, attendance: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full md:w-auto" />
-                      <div className="flex gap-2 w-full md:w-auto">
-                        <button onClick={saveEdit} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center justify-center transition-colors shadow-sm" title="儲存"><Save size={16}/></button>
-                        <button onClick={() => setEditingId(null)} className="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg flex items-center justify-center transition-colors" title="取消"><X size={16}/></button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div>
-                        <div className="flex items-center gap-2 text-blue-600 font-bold text-sm mb-1">
-                          <Flag size={14} /> {m.date}
+              {milestones.map(m => {
+                // 判斷該歷程是否已成過去式 (以當日 23:59:59 為界)
+                const milestoneDate = new Date(`${m.date}T23:59:59`);
+                const isPast = milestoneDate < now;
+
+                return (
+                  <div key={m.id} className={`bg-white p-5 rounded-2xl shadow-sm border-l-4 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4 ${isPast ? 'border-l-slate-300 opacity-75' : 'border-l-blue-500 border border-blue-100 shadow-blue-100/50'}`}>
+                    {editingId === m.id ? (
+                      <div className="flex flex-col md:flex-row gap-3 w-full items-center bg-blue-50/60 p-2 rounded-xl border border-blue-100">
+                        <input type="date" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full md:w-auto" />
+                        <input type="text" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full flex-1" />
+                        <input type="text" placeholder="出席對象" value={editForm.attendance} onChange={e => setEditForm({...editForm, attendance: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full md:w-auto" />
+                        <div className="flex gap-2 w-full md:w-auto">
+                          <button onClick={saveEdit} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center justify-center transition-colors shadow-sm" title="儲存"><Save size={16}/></button>
+                          <button onClick={() => setEditingId(null)} className="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg flex items-center justify-center transition-colors" title="取消"><X size={16}/></button>
                         </div>
-                        <h3 className="text-lg font-bold text-slate-800">{m.title}</h3>
                       </div>
-                      <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
-                        <div className="bg-slate-50 px-4 py-2 rounded-lg flex items-center gap-2 border border-slate-100">
-                          <Users size={16} className="text-slate-400"/>
-                          <div>
-                            <div className="text-xs text-slate-400 font-medium">需出席對象</div>
-                            <div className="text-sm font-bold text-slate-700">{m.attendance || '無特別指定'}</div>
+                    ) : (
+                      <>
+                        <div>
+                          <div className={`flex items-center gap-2 font-bold text-sm mb-1 ${isPast ? 'text-slate-400' : 'text-blue-600'}`}>
+                            <Flag size={14} /> {m.date}
+                            {/* 根據時間顯示不同狀態的標籤 */}
+                            {isPast ? (
+                              <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md ml-2 font-medium">已結束</span>
+                            ) : (
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md ml-2 font-bold animate-pulse">即將到來</span>
+                            )}
+                          </div>
+                          <h3 className={`text-lg font-bold ${isPast ? 'text-slate-500' : 'text-slate-800'}`}>{m.title}</h3>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                          <div className={`px-4 py-2 rounded-lg flex items-center gap-2 border ${isPast ? 'bg-slate-50 border-slate-100' : 'bg-blue-50/50 border-blue-100'}`}>
+                            <Users size={16} className={isPast ? 'text-slate-400' : 'text-blue-500'}/>
+                            <div>
+                              <div className={`text-xs font-medium ${isPast ? 'text-slate-400' : 'text-blue-500'}`}>需出席對象</div>
+                              <div className={`text-sm font-bold ${isPast ? 'text-slate-500' : 'text-blue-800'}`}>{m.attendance || '無特別指定'}</div>
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-1 border-l border-slate-200 pl-3 ml-1">
+                            <button onClick={() => startEdit(m)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="編輯此歷程">
+                              <Edit2 size={18} />
+                            </button>
+                            <button onClick={() => handleDelete(m.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="刪除此歷程">
+                              <Trash2 size={18} />
+                            </button>
                           </div>
                         </div>
-                        
-                        <div className="flex gap-1 border-l border-slate-200 pl-3 ml-1">
-                          <button onClick={() => startEdit(m)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="編輯此歷程">
-                            <Edit2 size={18} />
-                          </button>
-                          <button onClick={() => handleDelete(m.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="刪除此歷程">
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                      </>
+                    )}
+                  </div>
+                );
+              })}
               {milestones.length === 0 && <p className="text-slate-400 text-center py-4 text-sm">目前無重大歷程紀錄</p>}
             </div>
 

@@ -54,7 +54,7 @@
 
     // --- 模擬帳號資料 (前端權限管控) ---
     const USERS = [
-      { id: 'p1', username: 'admin', password: '1234', role: 'professor', name: '蕭詠璋教授、林子喬、郭佳靈、黃詩晴、紀宗瀚' },
+     { id: 'p1', username: 'admin', password: '1234', role: 'professor', name: '蕭詠璋教授、林子喬、郭佳靈、黃詩晴、紀宗瀚' },
       { id: 's1', username: 'T11425115', password: 'T11425115', role: 'student', name: '林子喬' },
       { id: 's2', username: 'T11425106', password: 'T11425106', role: 'student', name: '郭佳靈' },
       { id: 's3', username: 'T11425111', password: 'T11425111', role: 'student', name: '黃詩晴' },
@@ -303,6 +303,8 @@
         const records = progressData[studentId] || [];
         const [newDate, setNewDate] = useState('');
         const [newNote, setNewNote] = useState('');
+        
+        // 權限檢查：只有教授或該學生本人可以編輯
         const canEdit = currentUser.role === 'professor' || currentUser.id === studentId;
 
         const [editingId, setEditingId] = useState(null);
@@ -514,7 +516,7 @@
               <div className="flex items-center gap-4">
                 <div className="text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full flex items-center gap-2 border border-slate-200">
                   <span className={`w-2 h-2 rounded-full ${isFirebaseReady ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                  {currentUser.name} ({currentUser.role === '共同編輯' ? '共同編輯' : '研究生'})
+                  {currentUser.name} ({currentUser.role === 'professor' ? '共同編輯' : '研究生'})
                 </div>
                 <button onClick={() => { setCurrentUser(null); setSelectedStudent(null); }} className="text-slate-400 hover:text-red-500 transition-colors p-2" title="登出">
                   <LogOut size={20} />
@@ -544,28 +546,32 @@
 
             {activeTab === 'progress' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {currentUser.role === 'professor' && (
-                  <div className="lg:col-span-1 space-y-3">
-                    <h3 className="font-bold text-slate-600 mb-4 px-1 flex items-center gap-2"><Users size={18}/> 指導學生名單</h3>
-                    {students.map(stu => (
-                      <div 
-                        key={stu.id} 
-                        onClick={() => setSelectedStudent(stu.id)}
-                        className={`p-4 rounded-2xl cursor-pointer transition-all border flex items-center justify-between ${selectedStudent === stu.id ? 'bg-cyan-600 text-white border-cyan-600 shadow-md shadow-cyan-200' : 'bg-white text-slate-700 border-slate-200 hover:border-cyan-300 hover:shadow-sm'}`}
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className={`p-2 rounded-full ${selectedStudent === stu.id ? 'bg-white/20' : 'bg-slate-100'}`}>
-                            <User size={18} />
-                          </div>
-                          <span className="font-bold">{stu.name}</span>
-                        </div>
-                        <ChevronRight size={18} className={selectedStudent === stu.id ? 'opacity-100' : 'opacity-40'} />
-                      </div>
-                    ))}
-                  </div>
-                )}
                 
-                <div className={currentUser.role === 'professor' ? 'lg:col-span-2' : 'lg:col-span-3'}>
+                {/* 學生列表：現在移除角色限制，全體皆可看見 */}
+                <div className="lg:col-span-1 space-y-3">
+                  <h3 className="font-bold text-slate-600 mb-4 px-1 flex items-center gap-2">
+                    <Users size={18}/> 
+                    {currentUser.role === 'professor' ? '指導學生名單' : '同學進度列表'}
+                  </h3>
+                  {students.map(stu => (
+                    <div 
+                      key={stu.id} 
+                      onClick={() => setSelectedStudent(stu.id)}
+                      className={`p-4 rounded-2xl cursor-pointer transition-all border flex items-center justify-between ${selectedStudent === stu.id ? 'bg-cyan-600 text-white border-cyan-600 shadow-md shadow-cyan-200' : 'bg-white text-slate-700 border-slate-200 hover:border-cyan-300 hover:shadow-sm'}`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-full ${selectedStudent === stu.id ? 'bg-white/20' : 'bg-slate-100'}`}>
+                          <User size={18} />
+                        </div>
+                        <span className="font-bold">{stu.name}</span>
+                      </div>
+                      <ChevronRight size={18} className={selectedStudent === stu.id ? 'opacity-100' : 'opacity-40'} />
+                    </div>
+                  ))}
+                </div>
+                
+                {/* 學生進度時間軸：網格比例固定為 lg:col-span-2 */}
+                <div className="lg:col-span-2">
                   {selectedStudent ? (
                     <ProgressTimeline studentId={selectedStudent} />
                   ) : (

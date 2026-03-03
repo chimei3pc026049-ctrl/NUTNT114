@@ -54,11 +54,11 @@
 
     // --- 模擬帳號資料 (前端權限管控) ---
     const USERS = [
-      { id: 'p1', username: 'prof', password: '123', role: 'professor', name: '王教授' },
-      { id: 's1', username: 'stu1', password: '123', role: 'student', name: '張同學' },
-      { id: 's2', username: 'stu2', password: '123', role: 'student', name: '李同學' },
-      { id: 's3', username: 'stu3', password: '123', role: 'student', name: '陳同學' },
-      { id: 's4', username: 'stu4', password: '123', role: 'student', name: '林同學' },
+      { id: 'p1', username: 'admin', password: '1234', role: 'professor', name: '蕭詠璋 教授' },
+      { id: 's1', username: 'T11425115', password: 'T11425115', role: 'student', name: '林子喬' },
+      { id: 's2', username: 'T11425106', password: 'T11425106', role: 'student', name: '郭佳靈' },
+      { id: 's3', username: 'T11425111', password: 'T11425111', role: 'student', name: '黃詩晴' },
+      { id: 's4', username: 'T11425117', password: 'T11425117', role: 'student', name: '紀宗瀚' },
     ];
 
     function App() {

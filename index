@@ -1,1 +1,609 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  BookOpen, Calendar, Clock, LogOut, User, Users, 
+  ChevronRight, Plus, Edit2, CheckCircle2, Flag, AlertCircle, ShieldCheck, Trash2, Save, X
+} from 'lucide-react';
 
+// --- Firebase SDK 匯入 ---
+import { initializeApp } from "firebase/app";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
+import { 
+  getFirestore, collection, doc, onSnapshot, 
+  addDoc, updateDoc, deleteDoc, setDoc 
+} from "firebase/firestore";
+
+// --- Firebase 連線設定 (來自您的設定檔) ---
+const firebaseConfig = {
+  apiKey: "AIzaSyDEZ5nxjoVfXIZdBcYwaRNqDRUjrt6cHCA",
+  authDomain: "nutn-24687.firebaseapp.com",
+  projectId: "nutn-24687",
+  storageBucket: "nutn-24687.firebasestorage.app",
+  messagingSenderId: "58631180860",
+  appId: "1:58631180860:web:282fd94e85a79b747ea939",
+  measurementId: "G-RT9LHFGD1Q"
+};
+
+// 初始化 Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// 定義資料庫存取路徑 (遵循雲端安全規範)
+const DB_BASE = ['artifacts', 'nutn-24687', 'public', 'data'];
+
+// --- 模擬帳號資料 (前端權限管控) ---
+const USERS = [
+  { id: 'p1', username: 'prof', password: '123', role: 'professor', name: '王教授' },
+  { id: 's1', username: 'stu1', password: '123', role: 'student', name: '張同學' },
+  { id: 's2', username: 'stu2', password: '123', role: 'student', name: '李同學' },
+  { id: 's3', username: 'stu3', password: '123', role: 'student', name: '陳同學' },
+  { id: 's4', username: 'stu4', password: '123', role: 'student', name: '林同學' },
+];
+
+export default function App() {
+  const [currentUser, setCurrentUser] = useState(null);
+  const [activeTab, setActiveTab] = useState('progress');
+  const [isFirebaseReady, setIsFirebaseReady] = useState(false);
+  
+  // 雲端狀態管理
+  const [progressData, setProgressData] = useState({});
+  const [milestones, setMilestones] = useState([]);
+  const [meetings, setMeetings] = useState([]); // 新增：會議歷程陣列
+  
+  // 介面控制
+  const [selectedStudent, setSelectedStudent] = useState(null);
+
+  // --- 啟動 Firebase 連線與監聽 ---
+  useEffect(() => {
+    // 1. 底層靜默登入 (取得 Firestore 讀寫權限)
+    const initAuth = async () => {
+      try {
+        await signInAnonymously(auth);
+      } catch (error) {
+        console.error("Firebase Auth Error:", error);
+      }
+    };
+    initAuth();
+
+    // 2. 登入成功後，啟動即時資料監聽
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsFirebaseReady(true);
+
+        // 監聽：會議歷程 (取代原本的單一 meeting)
+        const unsubMeetings = onSnapshot(collection(db, ...DB_BASE, 'meetings'), (snapshot) => {
+          const loadedMeetings = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          // 依日期與時間自動排序
+          loadedMeetings.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+          setMeetings(loadedMeetings);
+        }, (err) => console.error(err));
+
+        // 監聽：重大歷程
+        const unsubMilestones = onSnapshot(collection(db, ...DB_BASE, 'milestones'), (snapshot) => {
+          const loadedMilestones = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          loadedMilestones.sort((a, b) => new Date(a.date) - new Date(b.date));
+          setMilestones(loadedMilestones);
+        }, (err) => console.error(err));
+
+        // 監聽：學生進度
+        const unsubProgress = onSnapshot(collection(db, ...DB_BASE, 'progress'), (snapshot) => {
+          const groupedProgress = {};
+          snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            if (!groupedProgress[data.studentId]) groupedProgress[data.studentId] = [];
+            groupedProgress[data.studentId].push({ id: doc.id, ...data });
+          });
+          // 依日期排序
+        Object.keys(groupedProgress).forEach(key => {
+          groupedProgress[key].sort((a, b) => new Date(a.date) - new Date(b.date));
+        });
+        setProgressData(groupedProgress);
+      }, (err) => console.error(err));
+
+      return () => {
+        unsubMeetings();
+        unsubMilestones();
+        unsubProgress();
+      };
+    }
+  });
+
+  return () => unsubscribeAuth();
+}, []);
+
+// 登入處理
+  const handleLogin = (e) => {
+    e.preventDefault();
+    const u = e.target.username.value;
+    const p = e.target.password.value;
+    const user = USERS.find(x => x.username === u && x.password === p);
+    if (user) {
+      setCurrentUser(user);
+      if (user.role === 'student') setSelectedStudent(user.id);
+    } else {
+      alert('帳號或密碼錯誤！請重試。');
+    }
+  };
+
+  // 登入畫面
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-cyan-50 flex items-center justify-center p-4 font-sans text-slate-800">
+        <div className="bg-white/80 backdrop-blur-xl p-8 rounded-3xl shadow-2xl border border-white max-w-md w-full relative overflow-hidden">
+          {!isFirebaseReady && (
+             <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+                <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin mb-2"></div>
+                <p className="text-cyan-700 font-bold text-sm">連線至雲端資料庫...</p>
+             </div>
+          )}
+          <div className="text-center mb-8">
+            <div className="bg-cyan-100 text-cyan-700 w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-inner">
+              <ShieldCheck size={32} />
+            </div>
+            <h1 className="text-2xl font-bold text-slate-800 mb-2">國立臺南大學</h1>
+            <p className="text-sm font-medium text-cyan-700 bg-cyan-50 py-1 px-3 rounded-full inline-block">經管系科管在職專班 碩士論文系統</p>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-5">
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">使用者帳號</label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 text-slate-400" size={18} />
+                <input name="username" type="text" required
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
+                  placeholder="請輸入帳號" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-500 mb-1">密碼</label>
+              <div className="relative">
+                <ShieldCheck className="absolute left-3 top-3 text-slate-400" size={18} />
+                <input name="password" type="password" required
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 outline-none transition-all"
+                  placeholder="請輸入密碼" />
+              </div>
+            </div>
+            <button type="submit" disabled={!isFirebaseReady} className="w-full disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-3 rounded-xl shadow-lg shadow-cyan-200 transition-all active:scale-95">
+              安全登入
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // --- 內部組件 ---
+
+  const MeetingTab = () => {
+    const [newDate, setNewDate] = useState('');
+    const [newTime, setNewTime] = useState('');
+    const [newTopic, setNewTopic] = useState('');
+
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({ date: '', time: '', topic: '' });
+
+    // 雲端新增會議
+    const handleAdd = async (e) => {
+      e.preventDefault();
+      if(!newDate || !newTime) return;
+      await addDoc(collection(db, ...DB_BASE, 'meetings'), {
+        date: newDate, time: newTime, topic: newTopic || '一般進度報告'
+      });
+      setNewDate(''); setNewTime(''); setNewTopic('');
+    };
+
+    // 雲端刪除會議
+    const handleDelete = async (id) => {
+      await deleteDoc(doc(db, ...DB_BASE, 'meetings', id));
+    };
+
+    const startEdit = (m) => {
+      setEditingId(m.id);
+      setEditForm({ date: m.date, time: m.time, topic: m.topic || '' });
+    };
+
+    // 雲端儲存會議
+    const saveEdit = async () => {
+      if(!editForm.date || !editForm.time) return;
+      await updateDoc(doc(db, ...DB_BASE, 'meetings', editingId), {
+        date: editForm.date, time: editForm.time, topic: editForm.topic
+      });
+      setEditingId(null);
+    };
+
+    const now = new Date();
+
+    return (
+      <div className="space-y-6 max-w-4xl mx-auto">
+        <div className="grid gap-4">
+          {meetings.map(m => {
+            const meetingDate = new Date(`${m.date}T${m.time}`);
+            const isPast = meetingDate < now; // 邏輯：自動判斷是否已過期
+
+            return (
+            <div key={m.id} className={`bg-white p-5 rounded-2xl shadow-sm border-l-4 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4 ${isPast ? 'border-l-slate-300 opacity-75' : 'border-l-indigo-500'}`}>
+              {editingId === m.id ? (
+                /* 編輯模式 UI (淡靛藍色底框) */
+                <div className="flex flex-col md:flex-row gap-3 w-full items-center bg-indigo-50/60 p-2 rounded-xl border border-indigo-100">
+                  <input type="date" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-indigo-500 text-sm w-full md:w-auto" />
+                  <input type="time" value={editForm.time} onChange={e => setEditForm({...editForm, time: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-indigo-500 text-sm w-full md:w-auto" />
+                  <input type="text" placeholder="討論主題" value={editForm.topic} onChange={e => setEditForm({...editForm, topic: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-indigo-500 text-sm w-full flex-1" />
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button onClick={saveEdit} className="flex-1 md:flex-none bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg flex items-center justify-center transition-colors shadow-sm" title="儲存"><Save size={16}/></button>
+                    <button onClick={() => setEditingId(null)} className="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg flex items-center justify-center transition-colors" title="取消"><X size={16}/></button>
+                  </div>
+                </div>
+              ) : (
+                /* 正常顯示模式 UI */
+                <>
+                  <div className="flex items-center gap-4">
+                    <div className={`p-3 rounded-2xl shadow-inner ${isPast ? 'bg-slate-100 text-slate-400' : 'bg-indigo-50 text-indigo-600'}`}>
+                      <Calendar size={28} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-lg font-black tracking-tight ${isPast ? 'text-slate-500' : 'text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-blue-600'}`}>{m.date}</span>
+                        <span className={`text-sm font-bold border-l-2 pl-2 ${isPast ? 'text-slate-400 border-slate-200' : 'text-indigo-500 border-indigo-200'}`}>{m.time}</span>
+                        {isPast && <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md ml-2 font-medium">已結束</span>}
+                      </div>
+                      <h3 className="text-md font-bold text-slate-700">{m.topic || '一般進度報告'}</h3>
+                    </div>
+                  </div>
+                  
+                  <div className="flex gap-1 border-l border-slate-200 pl-3 ml-1 self-end md:self-auto">
+                    <button onClick={() => startEdit(m)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="編輯此會議">
+                      <Edit2 size={18} />
+                    </button>
+                    <button onClick={() => handleDelete(m.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="刪除此會議">
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+            );
+          })}
+          {meetings.length === 0 && (
+            <div className="text-center py-12 bg-white rounded-3xl border border-slate-100 shadow-sm">
+              <Calendar size={48} className="mx-auto text-slate-200 mb-3" />
+              <p className="text-slate-400 font-medium">目前尚無 Meeting 紀錄</p>
+            </div>
+          )}
+        </div>
+
+        {/* 新增會議表單 */}
+        <form onSubmit={handleAdd} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mt-8 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-50 rounded-full blur-2xl -mr-10 -mt-10 opacity-60 pointer-events-none"></div>
+          <h4 className="text-md font-bold text-slate-700 mb-4 flex items-center gap-2 relative z-10"><Plus size={18} className="text-indigo-500"/> 新增 Meeting 排程</h4>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 relative z-10">
+            <input type="date" required value={newDate} onChange={e => setNewDate(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 outline-indigo-500 text-sm" />
+            <input type="time" required value={newTime} onChange={e => setNewTime(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 outline-indigo-500 text-sm" />
+            <input type="text" placeholder="討論主題 (選填，預設：一般進度報告)" value={newTopic} onChange={e => setNewTopic(e.target.value)} className="md:col-span-2 border border-slate-200 rounded-xl px-3 py-2 outline-indigo-500 text-sm" />
+          </div>
+          <button type="submit" className="mt-4 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 rounded-xl transition-colors text-sm shadow-sm relative z-10">
+            發布會議至資料庫
+          </button>
+        </form>
+      </div>
+    );
+  };
+
+  const ProgressTimeline = ({ studentId }) => {
+    const student = USERS.find(u => u.id === studentId);
+    const records = progressData[studentId] || [];
+    const [newDate, setNewDate] = useState('');
+    const [newNote, setNewNote] = useState('');
+    const canEdit = currentUser.role === 'professor' || currentUser.id === studentId;
+
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({ date: '', note: '' });
+
+    // 新增雲端進度
+    const handleAdd = async (e) => {
+      e.preventDefault();
+      if(!newDate || !newNote) return;
+      await addDoc(collection(db, ...DB_BASE, 'progress'), {
+        studentId, date: newDate, note: newNote
+      });
+      setNewDate(''); setNewNote('');
+    };
+
+    // 刪除雲端進度
+    const handleDelete = async (id) => {
+      await deleteDoc(doc(db, ...DB_BASE, 'progress', id));
+    };
+
+    const startEdit = (rec) => {
+      setEditingId(rec.id);
+      setEditForm({ date: rec.date, note: rec.note });
+    };
+
+    // 更新雲端進度
+    const saveEdit = async () => {
+      if(!editForm.date || !editForm.note) return;
+      await updateDoc(doc(db, ...DB_BASE, 'progress', editingId), {
+        date: editForm.date, note: editForm.note
+      });
+      setEditingId(null);
+    };
+
+    return (
+      <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
+        <div className="flex items-center gap-3 mb-8 border-b border-slate-100 pb-4">
+          <div className="bg-blue-50 p-2 rounded-lg text-blue-600"><User size={20}/></div>
+          <h2 className="text-xl font-bold text-slate-800">{student.name} 的論文進度</h2>
+        </div>
+
+        {/* 時間軸展示 */}
+        <div className="relative pl-6 border-l-2 border-cyan-100 space-y-8 mb-8">
+          {records.map((rec) => (
+            <div key={rec.id} className="relative">
+              <div className="absolute -left-[35px] bg-white border-2 border-cyan-400 w-4 h-4 rounded-full mt-1.5 shadow-sm"></div>
+              
+              {editingId === rec.id ? (
+                /* 編輯模式 UI (淡青色底框) */
+                <div className="bg-cyan-50/60 p-3 rounded-xl border border-cyan-200 shadow-sm flex flex-col md:flex-row gap-3">
+                  <input type="date" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} className="border border-cyan-300 rounded-lg px-3 py-2 outline-cyan-500 text-sm w-full md:w-auto bg-white" />
+                  <input type="text" value={editForm.note} onChange={e => setEditForm({...editForm, note: e.target.value})} className="border border-cyan-300 rounded-lg px-3 py-2 outline-cyan-500 text-sm w-full flex-1 bg-white" />
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button onClick={saveEdit} className="flex-1 md:flex-none bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded-lg flex items-center justify-center transition-colors shadow-sm"><Save size={16}/></button>
+                    <button onClick={() => setEditingId(null)} className="flex-1 md:flex-none bg-white border border-cyan-300 hover:bg-cyan-50 text-cyan-700 px-3 py-2 rounded-lg flex items-center justify-center transition-colors"><X size={16}/></button>
+                  </div>
+                </div>
+              ) : (
+                /* 正常顯示模式 UI */
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 hover:shadow-md transition-shadow group flex flex-col sm:flex-row justify-between items-start gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 text-sm font-bold text-cyan-600 mb-2">
+                      <Clock size={14} /> {rec.date}
+                    </div>
+                    <p className="text-slate-700 leading-relaxed">{rec.note}</p>
+                  </div>
+                  
+                  {/* 權限允許才顯示編輯與刪除按鈕 */}
+                  {canEdit && (
+                    <div className="flex gap-1 sm:opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                      <button onClick={() => startEdit(rec)} className="p-2 text-slate-400 hover:text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors" title="編輯進度">
+                        <Edit2 size={16} />
+                      </button>
+                      <button onClick={() => handleDelete(rec.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="刪除進度">
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ))}
+          {records.length === 0 && <p className="text-slate-400 text-sm">雲端尚無進度紀錄</p>}
+        </div>
+
+        {/* 新增進度表單 */}
+        {canEdit && (
+          <form onSubmit={handleAdd} className="bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <h4 className="text-sm font-bold text-slate-600 mb-3 flex items-center gap-2"><Plus size={16}/> 同步更新進度</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <input type="date" required value={newDate} onChange={e => setNewDate(e.target.value)} 
+                className="col-span-1 border border-slate-200 rounded-lg px-3 py-2 outline-cyan-500 text-sm" />
+              <input type="text" required placeholder="請輸入本次進度內容..." value={newNote} onChange={e => setNewNote(e.target.value)} 
+                className="col-span-1 md:col-span-2 border border-slate-200 rounded-lg px-3 py-2 outline-cyan-500 text-sm" />
+            </div>
+            <button type="submit" className="mt-3 w-full bg-cyan-600 hover:bg-cyan-700 text-white font-medium py-2 rounded-lg transition-colors text-sm">
+              上傳雲端紀錄
+            </button>
+          </form>
+        )}
+      </div>
+    );
+  };
+
+  const MilestonesTab = () => {
+    const [newDate, setNewDate] = useState('');
+    const [newTitle, setNewTitle] = useState('');
+    const [newAttendance, setNewAttendance] = useState('');
+
+    const [editingId, setEditingId] = useState(null);
+    const [editForm, setEditForm] = useState({ date: '', title: '', attendance: '' });
+
+    // 雲端新增歷程
+    const handleAdd = async (e) => {
+      e.preventDefault();
+      if(!newDate || !newTitle) return;
+      await addDoc(collection(db, ...DB_BASE, 'milestones'), {
+        date: newDate, title: newTitle, attendance: newAttendance
+      });
+      setNewDate(''); setNewTitle(''); setNewAttendance('');
+    };
+
+    // 雲端刪除歷程
+    const handleDelete = async (id) => {
+      await deleteDoc(doc(db, ...DB_BASE, 'milestones', id));
+    };
+
+    const startEdit = (m) => {
+      setEditingId(m.id);
+      setEditForm({ date: m.date, title: m.title, attendance: m.attendance });
+    };
+
+    // 雲端儲存歷程
+    const saveEdit = async () => {
+      if(!editForm.date || !editForm.title) return;
+      await updateDoc(doc(db, ...DB_BASE, 'milestones', editingId), {
+        date: editForm.date, title: editForm.title, attendance: editForm.attendance
+      });
+      setEditingId(null);
+    };
+
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4">
+          {milestones.map(m => (
+            <div key={m.id} className="bg-white p-5 rounded-2xl shadow-sm border border-l-4 border-slate-100 border-l-blue-500 hover:shadow-md transition-shadow flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {editingId === m.id ? (
+                /* 編輯模式 UI (淡藍色底框) */
+                <div className="flex flex-col md:flex-row gap-3 w-full items-center bg-blue-50/60 p-2 rounded-xl border border-blue-100">
+                  <input type="date" value={editForm.date} onChange={e => setEditForm({...editForm, date: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full md:w-auto" />
+                  <input type="text" value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full flex-1" />
+                  <input type="text" placeholder="出席對象" value={editForm.attendance} onChange={e => setEditForm({...editForm, attendance: e.target.value})} className="border border-slate-300 rounded-lg px-3 py-2 outline-blue-500 text-sm w-full md:w-auto" />
+                  <div className="flex gap-2 w-full md:w-auto">
+                    <button onClick={saveEdit} className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg flex items-center justify-center transition-colors shadow-sm" title="儲存"><Save size={16}/></button>
+                    <button onClick={() => setEditingId(null)} className="flex-1 md:flex-none bg-white border border-slate-300 hover:bg-slate-50 text-slate-600 px-3 py-2 rounded-lg flex items-center justify-center transition-colors" title="取消"><X size={16}/></button>
+                  </div>
+                </div>
+              ) : (
+                /* 正常顯示模式 UI */
+                <>
+                  <div>
+                    <div className="flex items-center gap-2 text-blue-600 font-bold text-sm mb-1">
+                      <Flag size={14} /> {m.date}
+                    </div>
+                    <h3 className="text-lg font-bold text-slate-800">{m.title}</h3>
+                  </div>
+                  <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-end">
+                    <div className="bg-slate-50 px-4 py-2 rounded-lg flex items-center gap-2 border border-slate-100">
+                      <Users size={16} className="text-slate-400"/>
+                      <div>
+                        <div className="text-xs text-slate-400 font-medium">需出席對象</div>
+                        <div className="text-sm font-bold text-slate-700">{m.attendance || '無特別指定'}</div>
+                      </div>
+                    </div>
+                    
+                    {/* 全體皆可：編輯與刪除按鈕 */}
+                    <div className="flex gap-1 border-l border-slate-200 pl-3 ml-1">
+                      <button onClick={() => startEdit(m)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="編輯此歷程">
+                        <Edit2 size={18} />
+                      </button>
+                      <button onClick={() => handleDelete(m.id)} className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="刪除此歷程">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          ))}
+          {milestones.length === 0 && <p className="text-slate-400 text-center py-4 text-sm">目前無重大歷程紀錄</p>}
+        </div>
+
+        {/* 全體皆可：新增重大歷程表單 */}
+        <form onSubmit={handleAdd} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mt-8">
+          <h4 className="text-md font-bold text-slate-700 mb-4 flex items-center gap-2"><Plus size={18} className="text-blue-500"/> 新增雲端歷程</h4>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <input type="date" required value={newDate} onChange={e => setNewDate(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 outline-blue-500 text-sm" />
+            <input type="text" required placeholder="活動名稱" value={newTitle} onChange={e => setNewTitle(e.target.value)} className="md:col-span-2 border border-slate-200 rounded-xl px-3 py-2 outline-blue-500 text-sm" />
+            <input type="text" placeholder="出席對象" value={newAttendance} onChange={e => setNewAttendance(e.target.value)} className="border border-slate-200 rounded-xl px-3 py-2 outline-blue-500 text-sm" />
+          </div>
+          <button type="submit" className="mt-4 w-full bg-slate-800 hover:bg-slate-700 text-white font-medium py-2.5 rounded-xl transition-colors text-sm">
+            發布至資料庫
+          </button>
+        </form>
+      </div>
+    );
+  };
+
+  // --- 主畫面渲染 ---
+  const students = USERS.filter(u => u.role === 'student');
+
+  return (
+    <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-800 selection:bg-cyan-200">
+      {/* 頂部導航 */}
+      <nav className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10">
+        <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="bg-gradient-to-br from-cyan-500 to-blue-600 text-white p-2 rounded-lg shadow-sm">
+              <BookOpen size={20} />
+            </div>
+            <div>
+              <h1 className="font-bold text-slate-800 hidden md:block">國立臺南大學 經管系科管在職專班</h1>
+              <h1 className="font-bold text-slate-800 md:hidden">NUTN 科管論文系統</h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="text-sm font-medium text-slate-600 bg-slate-100 px-3 py-1.5 rounded-full flex items-center gap-2 border border-slate-200">
+              <span className={`w-2 h-2 rounded-full ${isFirebaseReady ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+              {currentUser.name} ({currentUser.role === 'professor' ? '指導教授' : '研究生'})
+            </div>
+            <button onClick={() => { setCurrentUser(null); setSelectedStudent(null); }} className="text-slate-400 hover:text-red-500 transition-colors p-2" title="登出">
+              <LogOut size={20} />
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      {/* 主要內容區 */}
+      <main className="max-w-6xl mx-auto px-4 py-8">
+        
+        {/* 標籤切換 (新增 Meeting 標籤) */}
+        <div className="flex flex-wrap gap-2 mb-6 bg-slate-200/50 p-1 rounded-xl inline-flex w-full sm:w-auto">
+          <button 
+            onClick={() => setActiveTab('progress')}
+            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex-1 sm:flex-none ${activeTab === 'progress' ? 'bg-white text-cyan-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            論文進度管理
+          </button>
+          <button 
+            onClick={() => setActiveTab('milestones')}
+            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex-1 sm:flex-none ${activeTab === 'milestones' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            重大歷程與活動
+          </button>
+          <button 
+            onClick={() => setActiveTab('meeting')}
+            className={`px-6 py-2.5 rounded-lg font-bold text-sm transition-all flex-1 sm:flex-none ${activeTab === 'meeting' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>
+            Meeting 預定
+          </button>
+        </div>
+
+        {/* 內容區域 */}
+        {activeTab === 'progress' && (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 學生列表 (教授視角) */}
+            {currentUser.role === 'professor' && (
+              <div className="lg:col-span-1 space-y-3">
+                <h3 className="font-bold text-slate-600 mb-4 px-1 flex items-center gap-2"><Users size={18}/> 指導學生名單</h3>
+                {students.map(stu => (
+                  <div 
+                    key={stu.id} 
+                    onClick={() => setSelectedStudent(stu.id)}
+                    className={`p-4 rounded-2xl cursor-pointer transition-all border flex items-center justify-between ${selectedStudent === stu.id ? 'bg-cyan-600 text-white border-cyan-600 shadow-md shadow-cyan-200' : 'bg-white text-slate-700 border-slate-200 hover:border-cyan-300 hover:shadow-sm'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-full ${selectedStudent === stu.id ? 'bg-white/20' : 'bg-slate-100'}`}>
+                        <User size={18} />
+                      </div>
+                      <span className="font-bold">{stu.name}</span>
+                    </div>
+                    <ChevronRight size={18} className={selectedStudent === stu.id ? 'opacity-100' : 'opacity-40'} />
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* 進度時間軸視窗 */}
+            <div className={currentUser.role === 'professor' ? 'lg:col-span-2' : 'lg:col-span-3'}>
+              {selectedStudent ? (
+                <ProgressTimeline studentId={selectedStudent} />
+              ) : (
+                <div className="bg-white rounded-3xl p-12 text-center border border-slate-100 shadow-sm h-full flex flex-col items-center justify-center text-slate-400">
+                  <BookOpen size={48} className="mb-4 opacity-20" />
+                  <p>請在左側選擇一位學生以檢視其論文進度</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'milestones' && (
+          <div className="max-w-4xl mx-auto">
+             <MilestonesTab />
+          </div>
+        )}
+
+        {/* 新增 Meeting 內容區塊 */}
+        {activeTab === 'meeting' && (
+          <div className="w-full">
+            <MeetingTab />
+          </div>
+        )}
+
+      </main>
+    </div>
+  );
+}

@@ -52,9 +52,14 @@
     // 定義資料庫存取路徑
     const DB_BASE = ['artifacts', 'nutn-24687', 'public', 'data'];
 
-    // ---  ---
-    const _obfuscatedData = "JTVCJTdCJTIyaWQlMjIlM0ElMjJwMSUyMiUyQyUyMnVzZXJuYW1lJTIyJTNBJTIyYWRtaW4lMjIlMkMlMjJwYXNzd29yZCUyMiUzQSUyMjEyMzQ1Njc4JTIyJTJDJTIycm9sZSUyMiUzQSUyMnByb2Zlc3NvciUyMiUyQyUyMm5hbWUlMjIlM0ElMjIlRTglOTUlQUQlRTglQTklQTAlRTclOTIlOEIlRTYlOTUlOTklRTYlOEUlODglRTMlODAlODElRTYlOUUlOTclRTUlQUQlOTAlRTUlOTYlQUMlRTMlODAlODElRTklODMlQUMlRTQlQkQlQjMlRTklOUQlOTglRTMlODAlODElRTklQkIlODMlRTglQTklQTklRTYlOTklQjQlRTMlODAlODElRTclQjAlODAlRTUlQUUlOTclRTclODAlOUElMjIlN0QlMkMlN0IlMjJpZCUyMiUzQSUyMnMxJTIyJTJDJTIydXNlcm5hbWUlMjIlM0ElMjJUMTE0MjUxMTUlMjIlMkMlMjJwYXNzd29yZCUyMiUzQSUyMlQxMTQyNTExNSUyMiUyQyUyMnJvbGUlMjIlM0ElMjJzdHVkZW50JTIyJTJDJTIybmFtZSUyMiUzQSUyMiVFNiU5RSU5NyVFNSU5RCU5MCVFNSU5NiVBQyUyMiU3RCUyQyU3QiUyMmlkJTIyJTNBJTIyczIlMjIlMkMlMjJ1c2VybmFtZSUyMiUzQSUyMlQxMTQyNTEwNiUyMiUyQyUyMnBhc3N3b3JkJTIyJTNBJTIyVDExNDI1MTA2JTIyJTJDJTIycm9sZSUyMiUzQSUyMnN0dWRlbnQlMjIlMkMlMjJuYW1lJTIyJTNBJTIyRTklODMlQUMlRTQlQkQlQjMlRTklOUQlOTglMjIlN0QlMkMlN0IlMjJpZCUyMiUzQSUyMnMzJTIyJTJDJTIydXNlcm5hbWUlMjIlM0ElMjJUMTE0MjUxMTElMjIlMkMlMjJwYXNzd29yZCUyMiUzQSUyMlQxMTQyNTExMSUyMiUyQyUyMnJvbGUlMjIlM0ElMjJzdHVkZW50JTIyJTJDJTIybmFtZSUyMiUzQSUyMiVFOSVCQiU4MyVFOCVBOSVBOSVFNiU5OSVCNCUyMiU3RCUyQyU3QiUyMmlkJTIyJTNBJTIyczQlMjIlMkMlMjJ1c2VybmFtZSUyMiUzQSUyMlQxMTQyNTExNyUyMiUyQyUyMnBhc3N3b3JkJTIyJTNBJTIyVDExNDI1MTE3JTIyJTJDJTIycm9sZSUyMiUzQSUyMnN0dWRlbnQlMjIlMkMlMjJuYW1lJTIyJTNBJTIyRTclQjAlODAlRTUlQUUlOTclRTclODAlOUElMjIlN0QlNUQ=";
-    const USERS = JSON.parse(decodeURIComponent(atob(_obfuscatedData)));
+    // --- 模擬帳號資料 (前端權限管控) ---
+    const USERS = [
+     { id: 'p1', username: 'admin', password: '12345678', role: 'professor', name: '蕭詠璋教授、林子喬、郭佳靈、黃詩晴、紀宗瀚' },
+      { id: 's1', username: 'T11425115', password: 'T11425115', role: 'student', name: '林子喬' },
+      { id: 's2', username: 'T11425106', password: 'T11425106', role: 'student', name: '郭佳靈' },
+      { id: 's3', username: 'T11425111', password: 'T11425111', role: 'student', name: '黃詩晴' },
+      { id: 's4', username: 'T11425117', password: 'T11425117', role: 'student', name: '紀宗瀚' },
+    ];
 
     function App() {
       const [currentUser, setCurrentUser] = useState(null);

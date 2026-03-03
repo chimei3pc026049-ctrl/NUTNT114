@@ -203,7 +203,7 @@
           e.preventDefault();
           if(!newDate || !newTime) return;
           await addDoc(collection(db, ...DB_BASE, 'meetings'), {
-            date: newDate, time: newTime, topic: newTopic || '一般進度報告'
+            date: newDate, time: newTime, topic: newTopic || '論文討論'
           });
           setNewDate(''); setNewTime(''); setNewTopic('');
         };
